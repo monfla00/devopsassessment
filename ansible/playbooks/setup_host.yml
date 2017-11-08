@@ -1,0 +1,44 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+
+  - name: create dokku security group
+    ec2_group:
+      name: dokku-sg
+      description: A security group for the dokku setup
+      region: "{{ region }}"
+      aws_secret_key: "{{ secret }}"
+      aws_access_key: "{{ access }}"
+      rules:
+        - proto: tcp
+          from_port: 80
+          to_port: 80
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        - proto: all
+          cidr_ip: 0.0.0.0/0
+
+
+  - ec2:
+      region: "{{ region }}"
+      aws_secret_key: "{{ secret }}"
+      aws_access_key: "{{ access }}"
+      key_name: "{{ private_key }}"
+      instance_type: t2.micro
+      image: ami-6f198a0c
+      wait: yes
+      group: dokku-sg
+      count: 1
+    register: instance
+
+
+  - debug:
+      msg: "{{ instance['instances'][0]['public_ip'] }}"
+
+  - name: "update host file"
+    shell: "echo '[ec2]\n{{ instance['instances'][0]['public_ip'] }}'  > ../hosts/assessment_host"

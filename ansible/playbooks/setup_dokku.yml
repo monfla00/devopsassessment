@@ -1,0 +1,41 @@
+---
+- hosts: ec2
+  remote_user: ubuntu
+  become: true
+  become_user: root
+  tasks:
+
+    - file: path=/home/ubuntu/.aws/ state=directory owner=ubuntu group=users mode=0755
+
+    - template: src=../templates/bashrc dest=/home/ubuntu/.bashrc owner=ubuntu group=users mode=0644
+
+    - template: src=../templates/bash_profile dest=/home/ubuntu/.bash_profile owner=ubuntu group=users mode=0644
+
+    - template: src=../resources/public_key dest=/home/ubuntu/.ssh/public_key owner=ubuntu group=users mode=0644
+
+    - file: path=/home/ubuntu/dokku/ state=directory owner=ubuntu group=users mode=0755
+
+    - name: "get dokku"
+      get_url: url=https://raw.githubusercontent.com/dokku/dokku/v0.10.5/bootstrap.sh dest=/home/ubuntu/dokku/ mode=0755
+
+    - name: "install dokku"
+      shell: DOKKU_TAG=v0.10.5 bash /home/ubuntu/dokku/bootstrap.sh
+
+    - name: "backup authorized_keys"
+      stat: path=/home/ubuntu/.ssh/authorized_keys
+      register: authkeys_stat
+
+    - name: "backup"
+      command: cp /home/ubuntu/.ssh/authorized_keys /home/ubuntu/.ssh/authorized_keys.bkp
+      when: authkeys_stat.stat.exists
+
+    - name: "authorize public_key"
+      shell: "cat /home/ubuntu/.ssh/public_key"
+      register: pub_key
+
+    - name: "authorize public_key"
+      shell: "echo {{ pub_key.stdout }} | sudo dokku ssh-keys:add admin"
+      become: false
+
+    - name:
+      debug: msg="Go to http://{{ inventory_hostname }}/ and click save"
